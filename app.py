@@ -1,11 +1,33 @@
 import streamlit as st
 import os
 import tempfile
-from docx2pdf import convert
-import pythoncom
-import sys
 from pathlib import Path
-import time
+import sys
+
+# Try to import required packages with error handling
+try:
+    from docx2pdf import convert
+    HAS_DOCX2PDF = True
+except ImportError:
+    HAS_DOCX2PDF = False
+
+try:
+    import pythoncom
+    HAS_PYTHONCOM = True
+except ImportError:
+    HAS_PYTHONCOM = False
+
+try:
+    from fpdf import FPDF
+    HAS_FPDF = True
+except ImportError:
+    HAS_FPDF = False
+
+try:
+    from htmldocx import HtmlToDocx
+    HAS_HTMLDOCX = True
+except ImportError:
+    HAS_HTMLDOCX = False
 
 # Page configuration
 st.set_page_config(
@@ -45,28 +67,75 @@ st.markdown("""
         text-align: center;
         margin: 1rem 0;
     }
+    .warning-box {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-def convert_docx_to_pdf(docx_file, output_path):
+def convert_docx_to_pdf_simple(docx_file, output_path):
     """
-    Convert DOCX file to PDF using docx2pdf
+    Simple conversion using available methods
     """
     try:
-        # Create a temporary file for the DOCX
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_docx:
-            temp_docx.write(docx_file.getvalue())
-            temp_docx_path = temp_docx.name
+        # Method 1: Try docx2pdf (works on Windows with Word installed)
+        if HAS_DOCX2PDF:
+            # Create a temporary file for the DOCX
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_docx:
+                temp_docx.write(docx_file.getvalue())
+                temp_docx_path = temp_docx.name
+            
+            # Initialize COM if on Windows
+            if HAS_PYTHONCOM:
+                pythoncom.CoInitialize()
+            
+            # Convert to PDF
+            convert(temp_docx_path, output_path)
+            
+            # Clean up temporary file
+            os.unlink(temp_docx_path)
+            
+            return True, "Conversion successful using docx2pdf"
         
-        # Convert to PDF
-        convert(temp_docx_path, output_path)
+        # Method 2: Fallback to basic text conversion with FPDF
+        elif HAS_FPDF:
+            return convert_with_fpdf(docx_file, output_path)
         
-        # Clean up temporary file
-        os.unlink(temp_docx_path)
-        
-        return True, None
+        else:
+            return False, "No conversion methods available. Please install required packages."
+            
     except Exception as e:
-        return False, str(e)
+        return False, f"Conversion error: {str(e)}"
+
+def convert_with_fpdf(docx_file, pdf_path):
+    """
+    Basic conversion using FPDF (preserves text content only)
+    """
+    try:
+        import docx
+        from fpdf import FPDF
+        
+        # Read DOCX content
+        doc = docx.Document(docx_file)
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        
+        # Add text from DOCX
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                # Simple text extraction
+                pdf.multi_cell(0, 10, paragraph.text)
+        
+        pdf.output(pdf_path)
+        return True, "Conversion successful using FPDF (basic text preservation)"
+    except Exception as e:
+        return False, f"FPDF conversion error: {str(e)}"
 
 def main():
     # Header
@@ -76,6 +145,15 @@ def main():
     Welcome to the DOCX to PDF Converter! Upload your Microsoft Word document (.docx) 
     and convert it to PDF format instantly.
     """)
+    
+    # Platform info
+    if not HAS_DOCX2PDF:
+        st.markdown("""
+        <div class="warning-box">
+        ⚠️ <strong>Note:</strong> Using basic text conversion. For better formatting preservation, 
+        run this app on Windows with Microsoft Word installed.
+        </div>
+        """, unsafe_allow_html=True)
     
     # File upload section
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
@@ -121,10 +199,10 @@ def main():
                     temp_pdf_path = temp_pdf.name
                 
                 # Perform conversion
-                success, error_message = convert_docx_to_pdf(uploaded_file, temp_pdf_path)
+                success, message = convert_docx_to_pdf_simple(uploaded_file, temp_pdf_path)
                 
                 if success:
-                    st.markdown('<div class="success-msg">✅ Conversion successful!</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="success-msg">✅ {message}</div>', unsafe_allow_html=True)
                     
                     # Read the converted PDF
                     with open(temp_pdf_path, "rb") as f:
@@ -140,21 +218,32 @@ def main():
                         use_container_width=True
                     )
                     
+                    # Show file info
+                    pdf_size = len(pdf_data) / 1024
+                    st.info(f"**Converted PDF size:** {pdf_size:.2f} KB")
+                    
                     # Clean up temporary file
                     os.unlink(temp_pdf_path)
                     
                     st.balloons()
                     
                 else:
-                    st.markdown(f'<div class="error-msg">❌ Conversion failed: {error_message}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="error-msg">❌ {message}</div>', unsafe_allow_html=True)
                     
-                    # Fallback method suggestion
-                    st.info("""
-                    **Troubleshooting tips:**
-                    - Make sure the DOCX file is not corrupted
-                    - Try uploading a different DOCX file
-                    - Ensure the file is a valid Word document
-                    """)
+                    # Troubleshooting tips
+                    with st.expander("Troubleshooting Tips"):
+                        st.markdown("""
+                        **If conversion fails:**
+                        - Make sure the DOCX file is not corrupted
+                        - Try uploading a different DOCX file
+                        - For better formatting, run on Windows with Microsoft Word
+                        - Large files may take longer to process
+                        
+                        **Alternative solutions:**
+                        - Use Google Docs (File > Download > PDF)
+                        - Use Microsoft Word Online
+                        - Use LibreOffice (free, cross-platform)
+                        """)
 
     # Instructions section
     with st.expander("ℹ️ How to use this converter"):
@@ -168,15 +257,17 @@ def main():
         **Maximum file size:** 200MB (Streamlit limit)
         """)
     
-    # Features section
-    with st.expander("✨ Features"):
-        st.markdown("""
-        - ✅ Fast and reliable conversion
-        - ✅ Preserves formatting and layout
-        - ✅ Secure processing (files are temporarily stored)
-        - ✅ No registration required
-        - ✅ Free to use
-        """)
+    # Platform info section
+    with st.expander("🔧 Platform Information"):
+        st.write("**Available conversion methods:**")
+        st.write(f"- docx2pdf (Windows with MS Word): {'✅ Available' if HAS_DOCX2PDF else '❌ Not available'}")
+        st.write(f"- FPDF (Basic text conversion): {'✅ Available' if HAS_FPDF else '❌ Not available'}")
+        st.write(f"- Python COM (Windows): {'✅ Available' if HAS_PYTHONCOM else '❌ Not available'}")
+        
+        st.write("**For best results:**")
+        st.write("- Run on Windows with Microsoft Word installed")
+        "- For complex formatting, use the docx2pdf method"
+        "- For simple text documents, FPDF works well"
     
     # Footer
     st.markdown("---")
