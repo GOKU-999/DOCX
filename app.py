@@ -57,9 +57,19 @@ st.markdown("""
         border-radius: 0.5rem;
         padding: 1rem;
         margin: 0.5rem 0;
+        color: #000000 !important;
+    }
+    .feature-box strong {
+        color: #000000 !important;
+    }
+    .feature-box-text {
+        color: #000000 !important;
     }
     .stButton button {
         width: 100%;
+    }
+    .black-text {
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -207,7 +217,7 @@ def main():
     st.markdown('<h1 class="main-header">📄 DOCX to PDF Converter</h1>', unsafe_allow_html=True)
     
     st.markdown("""
-    <div style='text-align: center; margin-bottom: 2rem;'>
+    <div style='text-align: center; margin-bottom: 2rem; color: #000000;'>
     <h3>Free • No API Keys • No Registration • Privacy First</h3>
     Convert your Microsoft Word documents to PDF format instantly using open-source technology.
     </div>
@@ -327,43 +337,46 @@ def main():
         with st.expander("✨ Features", expanded=True):
             st.markdown("""
             <div class="feature-box">
-            🔒 <strong>No API Keys</strong><br>
-            Completely free, no registration required
+            <span style="color: #000000;">🔒 <strong>No API Keys</strong><br>
+            Completely free, no registration required</span>
             </div>
             
             <div class="feature-box">
-            🛡️ <strong>Privacy First</strong><br>
-            Files processed locally, never uploaded to cloud
+            <span style="color: #000000;">🛡️ <strong>Privacy First</strong><br>
+            Files processed locally, never uploaded to cloud</span>
             </div>
             
             <div class="feature-box">
-            🎯 <strong>Perfect Formatting</strong><br>
-            With LibreOffice, preserves all formatting
+            <span style="color: #000000;">🎯 <strong>Perfect Formatting</strong><br>
+            With LibreOffice, preserves all formatting</span>
             </div>
             
             <div class="feature-box">
-            ⚡ <strong>Fast Conversion</strong><br>
-            Quick processing even for large files
+            <span style="color: #000000;">⚡ <strong>Fast Conversion</strong><br>
+            Quick processing even for large files</span>
             </div>
             """, unsafe_allow_html=True)
     
     with col2:
         with st.expander("📖 How to Use", expanded=True):
             st.markdown("""
-            1. **Upload** your .docx file
-            2. **Preview** the document content
-            3. **Select** conversion quality
-            4. **Click** Convert to PDF
-            5. **Download** your perfect PDF
+            <div style="color: #000000;">
+            1. **Upload** your .docx file<br>
+            2. **Preview** the document content<br>
+            3. **Select** conversion quality<br>
+            4. **Click** Convert to PDF<br>
+            5. **Download** your perfect PDF<br><br>
             
-            **Supported:** .docx files only
-            **Max Size:** 200MB
+            **Supported:** .docx files only<br>
+            **Max Size:** 200MB<br>
             **Platforms:** Windows, Mac, Linux
-            """)
+            </div>
+            """, unsafe_allow_html=True)
     
     # Installation guide
     with st.expander("🔧 Install LibreOffice for Perfect Conversion"):
         st.markdown("""
+        <div style="color: #000000;">
         ### Windows:
         1. Download from [libreoffice.org](https://www.libreoffice.org/download/download-libreoffice/)
         2. Run the installer
@@ -388,12 +401,13 @@ def main():
         ```
         
         After installation, restart this app for LibreOffice detection.
-        """)
+        </div>
+        """, unsafe_allow_html=True)
     
     # Footer
     st.markdown("---")
     st.markdown(
-        "<div style='text-align: center; color: #666;'>"
+        "<div style='text-align: center; color: #000000;'>"
         "Made with ❤️ using Open Source • No API Keys • Privacy Focused"
         "</div>",
         unsafe_allow_html=True
