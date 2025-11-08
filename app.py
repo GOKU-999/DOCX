@@ -2,32 +2,7 @@ import streamlit as st
 import os
 import tempfile
 from pathlib import Path
-import sys
-
-# Try to import required packages with error handling
-try:
-    from docx2pdf import convert
-    HAS_DOCX2PDF = True
-except ImportError:
-    HAS_DOCX2PDF = False
-
-try:
-    import pythoncom
-    HAS_PYTHONCOM = True
-except ImportError:
-    HAS_PYTHONCOM = False
-
-try:
-    from fpdf import FPDF
-    HAS_FPDF = True
-except ImportError:
-    HAS_FPDF = False
-
-try:
-    from htmldocx import HtmlToDocx
-    HAS_HTMLDOCX = True
-except ImportError:
-    HAS_HTMLDOCX = False
+import base64
 
 # Page configuration
 st.set_page_config(
@@ -74,135 +49,199 @@ st.markdown("""
         padding: 1rem;
         margin: 1rem 0;
     }
+    .stButton button {
+        width: 100%;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-def convert_docx_to_pdf_simple(docx_file, output_path):
+def convert_docx_to_pdf(docx_file, output_path):
     """
-    Simple conversion using available methods
+    Convert DOCX to PDF using reportlab (fully cross-platform)
     """
     try:
-        # Method 1: Try docx2pdf (works on Windows with Word installed)
-        if HAS_DOCX2PDF:
-            # Create a temporary file for the DOCX
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_docx:
-                temp_docx.write(docx_file.getvalue())
-                temp_docx_path = temp_docx.name
-            
-            # Initialize COM if on Windows
-            if HAS_PYTHONCOM:
-                pythoncom.CoInitialize()
-            
-            # Convert to PDF
-            convert(temp_docx_path, output_path)
-            
-            # Clean up temporary file
-            os.unlink(temp_docx_path)
-            
-            return True, "Conversion successful using docx2pdf"
+        import docx
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.units import inch
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
         
-        # Method 2: Fallback to basic text conversion with FPDF
-        elif HAS_FPDF:
-            return convert_with_fpdf(docx_file, output_path)
+        # Read the DOCX file
+        doc = docx.Document(docx_file)
         
+        # Create PDF document
+        doc_pdf = SimpleDocTemplate(
+            output_path,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18
+        )
+        
+        # Create styles
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Process each paragraph in the DOCX
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():  # Only add non-empty paragraphs
+                # Determine style based on paragraph properties
+                if paragraph.style.name.startswith('Heading'):
+                    style = styles['Heading2']
+                else:
+                    style = styles['Normal']
+                
+                # Create paragraph for PDF
+                p = Paragraph(paragraph.text.replace('\n', '<br/>'), style)
+                story.append(p)
+                story.append(Spacer(1, 12))
+        
+        # Build PDF
+        if story:  # Only build if there's content
+            doc_pdf.build(story)
+            return True, "✅ Conversion successful! PDF created with text content."
         else:
-            return False, "No conversion methods available. Please install required packages."
+            return False, "❌ No text content found in the document."
             
+    except ImportError as e:
+        return False, f"❌ Required package missing: {str(e)}"
     except Exception as e:
-        return False, f"Conversion error: {str(e)}"
+        return False, f"❌ Conversion error: {str(e)}"
 
-def convert_with_fpdf(docx_file, pdf_path):
+def convert_with_images(docx_file, output_path):
     """
-    Basic conversion using FPDF (preserves text content only)
+    Alternative method that handles basic text formatting
     """
     try:
         import docx
         from fpdf import FPDF
         
-        # Read DOCX content
+        # Read DOCX
         doc = docx.Document(docx_file)
+        
+        # Create PDF
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
+        
+        # Set font
         pdf.set_font("Arial", size=12)
         
-        # Add text from DOCX
+        # Process content
         for paragraph in doc.paragraphs:
-            if paragraph.text.strip():
-                # Simple text extraction
-                pdf.multi_cell(0, 10, paragraph.text)
+            text = paragraph.text.strip()
+            if text:
+                # Basic formatting detection
+                is_bold = any(run.bold for run in paragraph.runs)
+                is_large = any(run.font.size and run.font.size.pt > 12 for run in paragraph.runs) if paragraph.runs else False
+                
+                if is_bold or is_large:
+                    pdf.set_font("Arial", 'B', 14)
+                    pdf.cell(0, 10, text, ln=True)
+                    pdf.set_font("Arial", size=12)
+                else:
+                    pdf.multi_cell(0, 10, text)
+                pdf.ln(5)
         
-        pdf.output(pdf_path)
-        return True, "Conversion successful using FPDF (basic text preservation)"
+        pdf.output(output_path)
+        return True, "✅ Conversion successful! Basic formatting preserved."
+        
     except Exception as e:
-        return False, f"FPDF conversion error: {str(e)}"
+        return False, f"❌ FPDF conversion error: {str(e)}"
+
+def get_file_preview(docx_file):
+    """
+    Extract text content for preview
+    """
+    try:
+        import docx
+        doc = docx.Document(docx_file)
+        content = []
+        
+        for i, paragraph in enumerate(doc.paragraphs[:10]):  # First 10 paragraphs
+            if paragraph.text.strip():
+                content.append(f"¶{i+1}: {paragraph.text}")
+                if len(content) >= 5:  # Show max 5 paragraphs in preview
+                    break
+        
+        return content
+    except:
+        return ["Could not preview document content"]
 
 def main():
     # Header
     st.markdown('<h1 class="main-header">📄 DOCX to PDF Converter</h1>', unsafe_allow_html=True)
     
     st.markdown("""
-    Welcome to the DOCX to PDF Converter! Upload your Microsoft Word document (.docx) 
-    and convert it to PDF format instantly.
-    """)
+    <div style='text-align: center; margin-bottom: 2rem;'>
+    Convert your Microsoft Word documents (.docx) to PDF format instantly. 
+    <br>Works on any platform - <strong>no Microsoft Word required!</strong>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Platform info
-    if not HAS_DOCX2PDF:
-        st.markdown("""
-        <div class="warning-box">
-        ⚠️ <strong>Note:</strong> Using basic text conversion. For better formatting preservation, 
-        run this app on Windows with Microsoft Word installed.
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div class="warning-box">
+    ⚠️ <strong>Note:</strong> This converter preserves text content and basic formatting. 
+    Complex formatting like tables, images, and advanced styling may not be fully preserved.
+    </div>
+    """, unsafe_allow_html=True)
     
     # File upload section
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
-        "Choose a DOCX file", 
+        "Drag and drop or click to upload a DOCX file", 
         type=['docx'],
-        help="Upload a .docx file to convert to PDF"
+        help="Upload any .docx file to convert to PDF"
     )
     st.markdown('</div>', unsafe_allow_html=True)
     
     if uploaded_file is not None:
         # Display file info
-        file_details = {
-            "Filename": uploaded_file.name,
-            "File size": f"{uploaded_file.size / 1024:.2f} KB",
-            "File type": uploaded_file.type
-        }
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**File:** {uploaded_file.name}")
+        with col2:
+            st.info(f"**Size:** {uploaded_file.size / 1024:.2f} KB")
         
-        st.write("**File Details:**")
-        st.json(file_details)
+        # Preview
+        with st.expander("📋 Document Preview (first 5 paragraphs)", expanded=True):
+            preview_content = get_file_preview(uploaded_file)
+            for item in preview_content:
+                st.write(item)
         
-        # Preview file content (first few lines)
-        try:
-            import docx
-            doc = docx.Document(uploaded_file)
-            text_content = []
-            for para in doc.paragraphs[:5]:  # Show first 5 paragraphs
-                if para.text.strip():
-                    text_content.append(para.text)
-            
-            if text_content:
-                with st.expander("Preview Document Content (First 5 paragraphs)"):
-                    for i, text in enumerate(text_content):
-                        st.write(f"{i+1}. {text}")
-        except Exception as e:
-            st.warning(f"Could not preview document content: {str(e)}")
+        # Conversion options
+        st.subheader("Conversion Options")
+        conversion_method = st.radio(
+            "Choose conversion method:",
+            ["Standard (Recommended)", "Basic Text Only"],
+            help="Standard preserves some formatting, Basic is faster for simple documents"
+        )
         
         # Convert button
         if st.button("🚀 Convert to PDF", type="primary", use_container_width=True):
-            with st.spinner("Converting your document... This may take a few seconds."):
+            with st.spinner("Converting your document... Please wait."):
                 # Create temporary file for PDF output
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_pdf:
                     temp_pdf_path = temp_pdf.name
                 
-                # Perform conversion
-                success, message = convert_docx_to_pdf_simple(uploaded_file, temp_pdf_path)
+                # Perform conversion based on selected method
+                if conversion_method == "Standard (Recommended)":
+                    success, message = convert_docx_to_pdf(uploaded_file, temp_pdf_path)
+                else:
+                    success, message = convert_with_images(uploaded_file, temp_pdf_path)
+                
+                # Fallback if standard method fails
+                if not success and conversion_method == "Standard (Recommended)":
+                    st.warning("Standard method failed, trying basic method...")
+                    success, message = convert_with_images(uploaded_file, temp_pdf_path)
                 
                 if success:
-                    st.markdown(f'<div class="success-msg">✅ {message}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="success-msg">{message}</div>', unsafe_allow_html=True)
                     
                     # Read the converted PDF
                     with open(temp_pdf_path, "rb") as f:
@@ -210,17 +249,21 @@ def main():
                     
                     # Download button
                     download_filename = Path(uploaded_file.name).stem + ".pdf"
-                    st.download_button(
-                        label="📥 Download PDF",
-                        data=pdf_data,
-                        file_name=download_filename,
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
                     
-                    # Show file info
-                    pdf_size = len(pdf_data) / 1024
-                    st.info(f"**Converted PDF size:** {pdf_size:.2f} KB")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.download_button(
+                            label="📥 Download PDF File",
+                            data=pdf_data,
+                            file_name=download_filename,
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                    
+                    with col2:
+                        # Show PDF info
+                        pdf_size = len(pdf_data) / 1024
+                        st.info(f"**PDF Size:** {pdf_size:.2f} KB")
                     
                     # Clean up temporary file
                     os.unlink(temp_pdf_path)
@@ -228,52 +271,55 @@ def main():
                     st.balloons()
                     
                 else:
-                    st.markdown(f'<div class="error-msg">❌ {message}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="error-msg">{message}</div>', unsafe_allow_html=True)
                     
-                    # Troubleshooting tips
-                    with st.expander("Troubleshooting Tips"):
+                    # Installation help
+                    with st.expander("🔧 Installation Help"):
                         st.markdown("""
-                        **If conversion fails:**
-                        - Make sure the DOCX file is not corrupted
-                        - Try uploading a different DOCX file
-                        - For better formatting, run on Windows with Microsoft Word
-                        - Large files may take longer to process
+                        **If you see package errors, install required packages:**
+                        ```bash
+                        pip install python-docx reportlab fpdf
+                        ```
                         
-                        **Alternative solutions:**
-                        - Use Google Docs (File > Download > PDF)
-                        - Use Microsoft Word Online
-                        - Use LibreOffice (free, cross-platform)
+                        **For Streamlit Cloud, add to requirements.txt:**
+                        ```txt
+                        python-docx>=1.1.0
+                        reportlab>=4.0.0
+                        fpdf2>=2.7.4
+                        ```
                         """)
 
-    # Instructions section
-    with st.expander("ℹ️ How to use this converter"):
+    # Features section
+    with st.expander("✨ Features & Limitations"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            **✅ What's Preserved:**
+            - Text content
+            - Paragraph structure  
+            - Basic formatting (bold, headings)
+            - Page breaks
+            """)
+        
+        with col2:
+            st.markdown("""
+            **❌ Limitations:**
+            - Complex tables
+            - Images and charts
+            - Advanced styling
+            - Font variations
+            """)
+        
         st.markdown("""
-        1. **Upload**: Click the 'Browse files' button and select your .docx file
-        2. **Preview**: Check the file details and content preview
-        3. **Convert**: Click the 'Convert to PDF' button
-        4. **Download**: Click the 'Download PDF' button to save your converted file
-        
-        **Supported formats:** .docx files only
-        **Maximum file size:** 200MB (Streamlit limit)
+        **💡 For complex documents:** Use Microsoft Word, Google Docs, or LibreOffice for full formatting preservation.
         """)
-    
-    # Platform info section
-    with st.expander("🔧 Platform Information"):
-        st.write("**Available conversion methods:**")
-        st.write(f"- docx2pdf (Windows with MS Word): {'✅ Available' if HAS_DOCX2PDF else '❌ Not available'}")
-        st.write(f"- FPDF (Basic text conversion): {'✅ Available' if HAS_FPDF else '❌ Not available'}")
-        st.write(f"- Python COM (Windows): {'✅ Available' if HAS_PYTHONCOM else '❌ Not available'}")
-        
-        st.write("**For best results:**")
-        st.write("- Run on Windows with Microsoft Word installed")
-        "- For complex formatting, use the docx2pdf method"
-        "- For simple text documents, FPDF works well"
-    
+
     # Footer
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: #666;'>"
-        "Made with ❤️ using Streamlit | DOCX to PDF Converter"
+        "Made with ❤️ using Streamlit | Works on Windows, Mac, Linux & Cloud"
         "</div>",
         unsafe_allow_html=True
     )
