@@ -108,6 +108,7 @@ if uploaded:
 else:
     st.info("Upload your DOCX file .")
 
-st.caption(" 🤗 THANK YOU FOR USING.VESITE AGAIN..... 😇")
+st.caption(" 🤗 THANK YOU FOR USING.VISIT AGAIN..... 😇")
+
 
 
