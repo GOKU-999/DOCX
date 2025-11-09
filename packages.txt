@@ -1,0 +1,5 @@
+libreoffice
+texlive-latex-recommended
+texlive-latex-extra
+texlive-fonts-recommended
+fonts-dejavu-core
