@@ -38,11 +38,28 @@ def is_pandoc_available():
 
 def convert_with_libreoffice(docx_path, outdir):
     exe = which("soffice") or which("libreoffice")
-    subprocess.run([exe, "--headless", "--convert-to", "pdf", docx_path, "--outdir", outdir],
-                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if not exe:
+        raise RuntimeError("LibreOffice not found. Make sure it's installed via packages.txt")
+
+    cmd = [
+        exe,
+        "--headless",
+        "--invisible",
+        "--norestore",
+        "--convert-to", "pdf",
+        docx_path,
+        "--outdir", outdir
+    ]
+
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    if process.returncode != 0:
+        st.error(f"LibreOffice failed:\n{process.stderr}")
+        raise RuntimeError("LibreOffice conversion failed. Check the above error output.")
+
     pdf_path = os.path.join(outdir, Path(docx_path).stem + ".pdf")
     if not os.path.exists(pdf_path):
-        raise RuntimeError("LibreOffice failed to create PDF.")
+        raise RuntimeError("LibreOffice did not produce a PDF file.")
     return pdf_path
 
 def convert_with_pandoc(docx_path, outdir):
@@ -94,3 +111,4 @@ else:
     st.info("Upload a DOCX file to start.")
 
 st.caption(f"Running on {platform.system()} | Python {platform.python_version()}")
+
