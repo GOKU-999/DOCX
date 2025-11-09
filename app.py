@@ -6,20 +6,18 @@ from pathlib import Path
 from shutil import which
 import platform
 
-st.set_page_config(page_title="DOCX → PDF Converter", page_icon="📄➡️📕", layout="centered")
+st.set_page_config(page_title="DOCX → PDF BY GOKU", page_icon="📄➡️📕", layout="centered")
 
-st.title("📄 DOCX → PDF Converter (Offline, No API Key)")
+st.title("📄 CONVERT YOUR DOCX FILE TO PDF FILE......")
 
 st.markdown("""
 Upload a `.docx` file to convert it to `.pdf` **locally on the server**.
 
-Supported methods:
-- 🟢 **LibreOffice (Linux)** — preserves full formatting  
-- 🟣 **docx2pdf (Windows only)** — uses Microsoft Word  
-- 🟡 **Pandoc (Fallback)** — simple text-based conversion  
+ MADE BY :- GOKU(PRATIK)
+ 
 """)
 
-uploaded = st.file_uploader("📂 Upload DOCX file", type=["docx"])
+uploaded = st.file_uploader("📂 Upload your DOCX file", type=["docx"])
 
 def is_libreoffice_available():
     return which("soffice") or which("libreoffice")
@@ -94,13 +92,13 @@ def convert_docx_to_pdf(docx_bytes, filename):
         return pdf_data, backend
 
 if uploaded:
-    if st.button("Convert to PDF"):
-        with st.spinner("Converting..."):
+    if st.button("Convert your DOCX to PDF"):
+        with st.spinner("🕰️ Wait for few seconds ! Converting......"):
             try:
                 pdf_bytes, backend = convert_docx_to_pdf(uploaded.getvalue(), uploaded.name)
-                st.success(f"✅ Conversion successful using {backend}!")
+                st.success(f"✅  SUCCESSFULLY CONVERTED TO PDF USING {backend}!")
                 st.download_button(
-                    label="⬇️ Download PDF",
+                    label="⬇️ Download your PDF",
                     data=pdf_bytes,
                     file_name=Path(uploaded.name).stem + ".pdf",
                     mime="application/pdf",
@@ -108,7 +106,8 @@ if uploaded:
             except Exception as e:
                 st.error(f"❌ Conversion failed: {e}")
 else:
-    st.info("Upload a DOCX file to start.")
+    st.info("Upload your DOCX file .")
 
-st.caption(f"Running on {platform.system()} | Python {platform.python_version()}")
+st.caption(" 🤗 THANK YOU FOR USING.VESITE AGAIN..... 😇")
+
 
